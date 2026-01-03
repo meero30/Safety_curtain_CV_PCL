@@ -1,8 +1,8 @@
 import cv2
+import time
 from ultralytics import YOLO
 
-# 1. Load Model (Standard COCO)
-# Class 0 is 'person' - highly accurate, no training needed
+# 1. Load Model
 print("Loading Safety System...")
 model = YOLO('yolov8n.pt')
 
@@ -11,148 +11,129 @@ cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-# 3. Define the "Danger Zone" (ROI)
-# Let's make the top-left corner the "Machine Area"
-# Format: (x_min, y_min, x_max, y_max)
-# ZONE_COORDS = (50, 50, 300, 300) 
-
 def is_overlapping(box1, box2):
-    """
-    Simple collision detection.
-    Returns True if the Person box overlaps the Danger Zone.
-    """
     x1_min, y1_min, x1_max, y1_max = box1
     x2_min, y2_min, x2_max, y2_max = box2
-
-    # If one rectangle is to the left of the other
-    if x1_max < x2_min or x2_max < x1_min:
-        return False
-    # If one rectangle is above the other
-    if y1_max < y2_min or y2_max < y1_min:
-        return False
-        
+    if x1_max < x2_min or x2_max < x1_min: return False
+    if y1_max < y2_min or y2_max < y1_min: return False
     return True
 
+# --- HELPER: DRAW INSTRUCTIONS ---
 
-# while True:
-#     ret, frame = cap.read()
-#     if ret:
-#         cv2.imshow('Rockwell Safety Curtain Demo - Press "s" to Setup Zone', frame)
-#     else:
-#         print("Error: Could not read frame from camera.")
-#         exit()
+def draw_setup_instructions(frame):
+    cv2.rectangle(frame, (0, 0), (640, 70), (0, 0, 0), -1)
     
-#     key = cv2.waitKey(1) & 0xFF
-#     if key == ord('s'):
-#         # Proceed to setup
-#         cv2.destroyWindow('Rockwell Safety Curtain Demo - Press "s" to Setup Zone')
-#         break
-#     elif key == ord('q'):
-#         cap.release()
-#         cv2.destroyAllWindows()
-#         exit()
+    cv2.putText(frame, "SETUP MODE", (10, 45), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+    
+    # Instructions Column
+    cv2.putText(frame, "Press 'S' to Draw Zone", (250, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    cv2.putText(frame, "Press 'SPACE' to Confirm", (250, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    cv2.putText(frame, "Press 'C' to Cancel / 'Q' to Quit", (250, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+def draw_run_dashboard(frame, fps, status, is_danger):
+    h, w, _ = frame.shape
+    # Top Bar
+    cv2.rectangle(frame, (0, 0), (w, 60), (0, 0, 0), -1)
+    
+    # Status Color
+    color = (0, 0, 255) if is_danger else (0, 255, 0)
+    
+    # Left: Status
+    cv2.putText(frame, f"STATUS: {status}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+    
+    # Right: FPS
+    cv2.putText(frame, f"FPS: {int(fps)}", (w - 150, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+    
+    # Bottom: Instructions
+    cv2.putText(frame, "PRESS 'Q' TO QUIT", (20, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
 
+# --- INTERACTIVE ZONE SELECTION ---
+ZONE_COORDS = None
 
-# --- STEP 4: INTERACTIVE ZONE SELECTION ---
-# Read a single frame to draw on
 while True:
     ret, frame = cap.read()
     if ret:
-        # print("---------------------------------------------------------")
-        # print("INSTRUCTIONS:")
-        # print("1. Click and Drag a box around the Danger Area.")
-        # print("2. Press SPACE or ENTER to confirm.")
-        # print("3. Press 'c' to cancel/retry.")
-        # print("---------------------------------------------------------")
+        draw_setup_instructions(frame)
         
-        cv2.imshow('Rockwell Safety Curtain Demo - Press "s" to Setup Zone', frame)
-        # Opens a window and waits for user to draw
-        # Returns (x, y, w, h)
+        cv2.imshow('Rockwell Safety Curtain Setup', frame)
+        
         key = cv2.waitKey(1) & 0xFF
         
         if key == ord('s'):
-            cv2.destroyWindow('Rockwell Safety Curtain Demo - Press "s" to Setup Zone')
-        
-
+            cv2.destroyWindow('Rockwell Safety Curtain Setup')
+            
             roi = cv2.selectROI("SETUP: Draw Danger Zone", frame, fromCenter=False, showCrosshair=True)
             
-            # Convert (x,y,w,h) to (x1,y1,x2,y2) for our logic
             x_start, y_start, width, height = roi
             ZONE_COORDS = (x_start, y_start, x_start + width, y_start + height)
             
+            # Check for cancellation
             if roi[2] == 0 or roi[3] == 0:
                 cv2.destroyWindow("SETUP: Draw Danger Zone")
                 print("Selection Cancelled. Press 's' to try again.")
-                continue # Loops back to the video feed
+                continue 
 
-            # Close the selector window
             cv2.destroyWindow("SETUP: Draw Danger Zone")
             print(f"Zone Confirmed: {ZONE_COORDS}")
-
-            print("checkpoint")
+            print("Starting AI...")
             break
-            
-        
 
         elif key == ord('q'):
             cap.release()
             cv2.destroyAllWindows()
             exit()
     else:
-        print("Error: Could not read frame for setup.")
+        print("Error: Could not read frame.")
         exit()
 
 
-
+# --- AI RUN LOOP ---
+prev_time = 0
 
 while True:
+    curr_time = time.time()
     ret, frame = cap.read()
-    if not ret:
-        break
+    if not ret: break
+
+    # FPS Calculation
+    fps = 1 / (curr_time - prev_time) if prev_time > 0 else 0
+    prev_time = curr_time
 
     # Run Inference
     results = model(frame, stream=True, verbose=False)
     
-    # Default State: SYSTEM SAFE (Green)
     zone_color = (0, 255, 0) 
-    safety_status = "RUNNING"
+    safety_status = "SAFE"
     trigger_stop = False
 
     for r in results:
         boxes = r.boxes
         for box in boxes:
-            # We ONLY check for Class 0 (Person)
             cls = int(box.cls[0])
             conf = float(box.conf[0])
             
             if cls == 0 and conf > 0.5:
-                # Get Person Coordinates
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 
-                # Draw box around person
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 100, 0), 2)
-
-                # Check for Collision with Danger Zone
-                person_box = (x1, y1, x2, y2)
-                if is_overlapping(person_box, ZONE_COORDS):
+                # Check Collision
+                if is_overlapping((x1, y1, x2, y2), ZONE_COORDS):
                     trigger_stop = True
                     zone_color = (0, 0, 255) # RED
-                    safety_status = "EMERGENCY STOP"
-                    
-                    # ----------------------------------------------------
-                    # [PLACEHOLDER] MODBUS WRITE HERE
-                    # client.write_coil(address=1, value=0) # Cut Power
-                    # ----------------------------------------------------
+                    safety_status = "E-STOP"
+                
+                # Draw Person (Red if dangerous, Orange if safe)
+                p_color = (0, 0, 255) if trigger_stop else (255, 100, 0)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), p_color, 2)
 
-    # Draw the Danger Zone
+    # Draw Danger Zone
     cv2.rectangle(frame, (ZONE_COORDS[0], ZONE_COORDS[1]), (ZONE_COORDS[2], ZONE_COORDS[3]), zone_color, 3)
-    cv2.putText(frame, "DANGER ZONE (MOTOR)", (ZONE_COORDS[0], ZONE_COORDS[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, zone_color, 2)
+    cv2.putText(frame, "DANGER ZONE", (ZONE_COORDS[0], ZONE_COORDS[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, zone_color, 2)
 
-    # Status Overlay
-    cv2.putText(frame, f"STATUS: {safety_status}", (20, 450), cv2.FONT_HERSHEY_SIMPLEX, 1, zone_color, 3)
+    # ADDED: Draw Dashboard
+    draw_run_dashboard(frame, fps, safety_status, trigger_stop)
 
-    cv2.imshow('Rockwell Safety Curtain Demo', frame)
+    cv2.imshow('Rockwell Safety Curtain (Running)', frame)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
