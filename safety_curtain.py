@@ -14,7 +14,7 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 # 3. Define the "Danger Zone" (ROI)
 # Let's make the top-left corner the "Machine Area"
 # Format: (x_min, y_min, x_max, y_max)
-ZONE_COORDS = (50, 50, 300, 300) 
+# ZONE_COORDS = (50, 50, 300, 300) 
 
 def is_overlapping(box1, box2):
     """
@@ -32,6 +32,79 @@ def is_overlapping(box1, box2):
         return False
         
     return True
+
+
+# while True:
+#     ret, frame = cap.read()
+#     if ret:
+#         cv2.imshow('Rockwell Safety Curtain Demo - Press "s" to Setup Zone', frame)
+#     else:
+#         print("Error: Could not read frame from camera.")
+#         exit()
+    
+#     key = cv2.waitKey(1) & 0xFF
+#     if key == ord('s'):
+#         # Proceed to setup
+#         cv2.destroyWindow('Rockwell Safety Curtain Demo - Press "s" to Setup Zone')
+#         break
+#     elif key == ord('q'):
+#         cap.release()
+#         cv2.destroyAllWindows()
+#         exit()
+
+
+
+# --- STEP 4: INTERACTIVE ZONE SELECTION ---
+# Read a single frame to draw on
+while True:
+    ret, frame = cap.read()
+    if ret:
+        # print("---------------------------------------------------------")
+        # print("INSTRUCTIONS:")
+        # print("1. Click and Drag a box around the Danger Area.")
+        # print("2. Press SPACE or ENTER to confirm.")
+        # print("3. Press 'c' to cancel/retry.")
+        # print("---------------------------------------------------------")
+        
+        cv2.imshow('Rockwell Safety Curtain Demo - Press "s" to Setup Zone', frame)
+        # Opens a window and waits for user to draw
+        # Returns (x, y, w, h)
+        key = cv2.waitKey(1) & 0xFF
+        
+        if key == ord('s'):
+            cv2.destroyWindow('Rockwell Safety Curtain Demo - Press "s" to Setup Zone')
+        
+
+            roi = cv2.selectROI("SETUP: Draw Danger Zone", frame, fromCenter=False, showCrosshair=True)
+            
+            # Convert (x,y,w,h) to (x1,y1,x2,y2) for our logic
+            x_start, y_start, width, height = roi
+            ZONE_COORDS = (x_start, y_start, x_start + width, y_start + height)
+            
+            if roi[2] == 0 or roi[3] == 0:
+                cv2.destroyWindow("SETUP: Draw Danger Zone")
+                print("Selection Cancelled. Press 's' to try again.")
+                continue # Loops back to the video feed
+
+            # Close the selector window
+            cv2.destroyWindow("SETUP: Draw Danger Zone")
+            print(f"Zone Confirmed: {ZONE_COORDS}")
+
+            print("checkpoint")
+            break
+            
+        
+
+        elif key == ord('q'):
+            cap.release()
+            cv2.destroyAllWindows()
+            exit()
+    else:
+        print("Error: Could not read frame for setup.")
+        exit()
+
+
+
 
 while True:
     ret, frame = cap.read()
