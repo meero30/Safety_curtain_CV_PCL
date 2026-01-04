@@ -8,13 +8,15 @@ import threading
 
 # --- CONFIGURATION ---
 PLC_IP = '127.0.0.1'  # Localhost (Simulator)
+
+# Old Modbus Setup (Commented Out), CCW Free version does not use Modbus in its micro800 Simulator
 # PLC_PORT = 502
 # COIL_ADDRESS = 0      # Maps to '000001' in Rockwell
 # print(f"Connecting to PLC at {PLC_IP}...")
 # client = ModbusTcpClient(PLC_IP, port=PLC_PORT)
 # connection_status = client.connect()
 
-# 1. Global flag to prevent spawning 100 threads if the hand stays in the frame
+# Global flag to prevent spawning 100 threads if the persons' bounding box stays in the danger zone boundaries
 safety_trip_active = False 
 
 def _safety_worker():
@@ -52,7 +54,6 @@ def trigger_safety_async():
         t = threading.Thread(target=_safety_worker)
         # Daemon=True means this thread will die if you close the main app
         t.daemon = True 
-        # Start it (This returns immediately, so your video frame doesn't lag)
         t.start()
         print("[Main] Safety thread started...")
 
@@ -189,6 +190,8 @@ while True:
 
     # ADDED: Draw Dashboard
     draw_run_dashboard(frame, fps, safety_status, trigger_stop)
+    
+    # Old Modbus Write (Commented Out)
     # --- MODBUS WRITE ---
     # if connection_status:
     #     try:
@@ -197,7 +200,8 @@ while True:
     #     except Exception as e:
     #         print(f"Modbus Error: {e}")
 
-    # Comms through LogixDriver
+    
+    # --- Comms through LogixDriver ---
 
     cv2.imshow('Rockwell Safety Curtain (Running)', frame)
 
