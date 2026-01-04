@@ -20,10 +20,7 @@ In traditional manufacturing environments, "Light Curtains" (infrared safety bea
 ## Demonstration
 Below is a video recording of the system in action. The Python script detects the intrusion, sends the trip signal, and the PLC immediately de-energizes the coil.
 
-<video width="100%" controls>
-  <source src="Safety_curtain_demo.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+![DEMO VIDEO] (https://github.com/meero30/Safety_curtain_CV_PCL/blob/main/Safety_curtain_demo.mp4)
 
 ## PLC Logic
 The control logic is implemented in Connected Components Workbench (CCW). It features a "Safety Seal-in" circuit where the `b_AI_Safety_Trip` tag acts as a normally closed (NC) break contact.
