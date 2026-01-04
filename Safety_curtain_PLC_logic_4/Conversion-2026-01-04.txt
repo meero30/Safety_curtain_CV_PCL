@@ -1,0 +1,24 @@
+---------- Controller change started: Safety_curtain_PLC_logic_4 ----------
+
+---------- Importing Project : controller\Controller.acfproj ----------
+Changing controller type: 2080-LC50-48QWB (Version 12) to 2080-LC50-48QWB-SIM (Version 12)
+Warning: Serial port is not supported and its configuration is discarded.
+Warning: USB port is not supported and its configuration is discarded.
+Information: Motion Feedback is not supported and its configuration is discarded.
+Information: Embedded Real Time Clock is not supported and its configuration is discarded.
+Information: Memory Card is not supported and its configuration is discarded.
+Information: Data log is not supported and its configuration is discarded.
+Information: Recipe is not supported and its configuration is discarded.
+Information: UPMUI interrupt type is not supported and its configuration is discarded.
+Information: HSC interrupt type is not supported and its configuration is discarded.
+
+Import Controller Complete -- 0 Errors, 2 Warnings
+
+---------- End of project conversion ----------
+
+The source project has been saved in 
+"C:\Users\Miro Hernandez\Documents\CCW\Safety_curtain_PLC_logic_2\Safety_curtain_PLC_logic_2.ccwsln"
+
+Log file has been written in
+c:\users\miro hernandez\documents\ccw\safety_curtain_plc_logic_4\Conversion-2026-01-04.txt
+========== Controller Change: 1 succeeded, 0 failed ==========

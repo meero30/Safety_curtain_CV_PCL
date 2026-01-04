@@ -1,0 +1,16 @@
+PROGRAM Safety_curtain_PLC
+#info= QLD
+BOF
+
+
+(**)
+
+SOR  [0,1] (**) (**)  
+ BST  XIC  [1,0] (*_IO_EM_DI_00*) (*Start_button*)
+   NXB  XIC  [1,1] (*_IO_EM_DO_00*) (*Motor_coil*)
+ BND
+  XIO  [2,0] (*_IO_EM_DI_01*) (*Stop_button*)  XIO  [3,0] (*b_AI_Safety_Trip*) (**)  OTE  [4,0] (*_IO_EM_DO_00*) (*Motor_coil*)
+EOR [5,0]
+EOF
+#end_info
+END_PROGRAM
