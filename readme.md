@@ -22,6 +22,10 @@ Below is a video recording of the system in action. The Python script detects th
 
 
 
+https://github.com/user-attachments/assets/388c0f12-3a45-47fa-86c9-88cd3e3c0caa
+
+
+
 ## PLC Logic
 The control logic is implemented in Connected Components Workbench (CCW). It features a "Safety Seal-in" circuit where the `b_AI_Safety_Trip` tag acts as a normally closed (NC) break contact.
 
