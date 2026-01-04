@@ -1,6 +1,18 @@
 import cv2
 import time
 from ultralytics import YOLO
+from pymodbus.client import ModbusTcpClient
+
+
+# --- CONFIGURATION ---
+PLC_IP = '127.0.0.1'  # Localhost (Simulator)
+PLC_PORT = 502
+COIL_ADDRESS = 0      # Maps to '000001' in Rockwell
+print(f"Connecting to PLC at {PLC_IP}...")
+client = ModbusTcpClient(PLC_IP, port=PLC_PORT)
+connection_status = client.connect()
+
+
 
 # 1. Load Model
 print("Loading Safety System...")
@@ -110,10 +122,10 @@ while True:
     for r in results:
         boxes = r.boxes
         for box in boxes:
-            cls = int(box.cls[0])
+            cls = int(box.cls[0]) # ONLY check for Class 0 (Person)
             conf = float(box.conf[0])
             
-            if cls == 0 and conf > 0.5:
+            if cls == 0 and conf > 0.8: # 0.8 confidence threshold
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 
                 # Check Collision
@@ -132,6 +144,13 @@ while True:
 
     # ADDED: Draw Dashboard
     draw_run_dashboard(frame, fps, safety_status, trigger_stop)
+    # --- MODBUS WRITE ---
+    if connection_status:
+        try:
+            # Write 1 (True) if Danger, 0 (False) if Safe
+            client.write_coil(COIL_ADDRESS, trigger_stop, slave=1)
+        except Exception as e:
+            print(f"Modbus Error: {e}")
 
     cv2.imshow('Rockwell Safety Curtain (Running)', frame)
 
