@@ -1,18 +1,62 @@
 import cv2
 import time
 from ultralytics import YOLO
-from pymodbus.client import ModbusTcpClient
+from pycomm3 import LogixDriver
+import threading
+# from pymodbus.client import ModbusTcpClient
 
 
 # --- CONFIGURATION ---
 PLC_IP = '127.0.0.1'  # Localhost (Simulator)
-PLC_PORT = 502
-COIL_ADDRESS = 0      # Maps to '000001' in Rockwell
-print(f"Connecting to PLC at {PLC_IP}...")
-client = ModbusTcpClient(PLC_IP, port=PLC_PORT)
-connection_status = client.connect()
+# PLC_PORT = 502
+# COIL_ADDRESS = 0      # Maps to '000001' in Rockwell
+# print(f"Connecting to PLC at {PLC_IP}...")
+# client = ModbusTcpClient(PLC_IP, port=PLC_PORT)
+# connection_status = client.connect()
 
+# 1. Global flag to prevent spawning 100 threads if the hand stays in the frame
+safety_trip_active = False 
 
+def _safety_worker():
+    """
+    This is the slow function that runs in the background.
+    It connects, writes, and disconnects.
+    """
+    global safety_trip_active
+    try:
+        print("[Thread] Connecting to PLC...")
+        with LogixDriver(PLC_IP) as plc:
+            if plc.connected:
+                plc.write('b_AI_Safety_Trip', True)
+                print("[Thread] SUCCESS: PLC Safety Trip Activated!")
+            else:
+                print("[Thread] Failed to connect.")
+    except Exception as e:
+        print(f"[Thread] Error: {e}")
+    finally:
+        # safety_trip_active = False 
+        pass
+
+def trigger_safety_async():
+    """
+    Call THIS function from your main loop. 
+    It is instant and non-blocking.
+    """
+    global safety_trip_active
+    
+    # Only start a new thread if one isn't already running/finished
+    if not safety_trip_active:
+        safety_trip_active = True
+        
+        # Create the thread
+        t = threading.Thread(target=_safety_worker)
+        # Daemon=True means this thread will die if you close the main app
+        t.daemon = True 
+        # Start it (This returns immediately, so your video frame doesn't lag)
+        t.start()
+        print("[Main] Safety thread started...")
+
+    
 
 # 1. Load Model
 print("Loading Safety System...")
@@ -130,6 +174,7 @@ while True:
                 
                 # Check Collision
                 if is_overlapping((x1, y1, x2, y2), ZONE_COORDS):
+                    trigger_safety_async()  # Call the async safety trigger
                     trigger_stop = True
                     zone_color = (0, 0, 255) # RED
                     safety_status = "E-STOP"
@@ -145,12 +190,14 @@ while True:
     # ADDED: Draw Dashboard
     draw_run_dashboard(frame, fps, safety_status, trigger_stop)
     # --- MODBUS WRITE ---
-    if connection_status:
-        try:
-            # Write 1 (True) if Danger, 0 (False) if Safe
-            client.write_coil(COIL_ADDRESS, trigger_stop, slave=1)
-        except Exception as e:
-            print(f"Modbus Error: {e}")
+    # if connection_status:
+    #     try:
+    #         # Write 1 (True) if Danger, 0 (False) if Safe
+    #         client.write_coil(COIL_ADDRESS, trigger_stop, slave=1)
+    #     except Exception as e:
+    #         print(f"Modbus Error: {e}")
+
+    # Comms through LogixDriver
 
     cv2.imshow('Rockwell Safety Curtain (Running)', frame)
 
